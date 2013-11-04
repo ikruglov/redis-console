@@ -1,4 +1,4 @@
-#!/usr/local/bin/booking-perl
+#!/usr/bin/perl
 
 use strict;
 use warnings;
@@ -9,6 +9,24 @@ use Term::ReadLine;
 use Getopt::Long::Descriptive;
 
 my %COMMANDS = (
+    connect => sub {
+        my ($host, $port) = @_;
+        my $redis_server = $host . ':' . $port;
+
+        my $redis = Redis->new(
+            server => $redis_server,
+            reconnect => 60
+        );
+
+        if ($redis) {
+            print "hello $redis_server\n";
+        } else {
+            print "failed to connect to $redis_server";
+        }
+
+        return $redis;
+    },
+
     ls => sub {
         my ($redis, $pattern) = @_;
         $pattern //= '*';
@@ -48,22 +66,12 @@ if ( $cmd_opts->help ) {
     exit 0;
 }
 
-my $term= Term::ReadLine->new('Perl redis_cli');
+my $term = Term::ReadLine->new('Perl redis_cli');
 $term->Attribs->{completion_function} = \&complete;
 
-my $redis_server = $cmd_opts->host . ':' . $cmd_opts->port;
-my $redis = Redis->new(
-    server => $redis_server,
-    reconnect => 60
-);
+my $redis = $COMMANDS{connect}->($cmd_opts->host, $cmd_opts->port);
+die unless $redis;
 
-if ($redis) {
-    print "hello $redis_server\n";
-} else {
-    die "failed to connect to $redis_server";
-}
-
-MAIN_LOOP:
 while (1) {
     my $line = $term->readline('redis> ');
     last unless defined $line;
@@ -84,7 +92,19 @@ while (1) {
         my @result = $redis->$cmd(@args);
         print_result(\@result);
     } else {
-        print "unknown command '$cmd'\n";
+        eval {
+            $redis->$cmd(@args);
+            1;
+        } or do {
+            my $error = $@ || 'zombie error';
+            if ($error =~ /unknown command/) {
+                print "unknown command '$cmd'\n";
+            } elsif ($error =~ /wrong number of arguments/) {
+                print "wrong number of arguments for '$cmd' command\n";
+            } else {
+                print "$error\n";
+            }
+        }
     }
 }
 
