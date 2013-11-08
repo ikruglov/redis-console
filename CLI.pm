@@ -66,9 +66,11 @@ sub do_repl {
 
     $attr->{completion_function} = sub {
         my ($text, $line, $start) = @_;
-        if ($start == 0) {
-            return grep(/^$text/, @{ $self->all_cmds() });
-        }
+        my @items = $start == 0
+                    ? @{ $self->all_cmds() }
+                    : eval { $self->redis->keys('*') };
+
+        return grep(/^$text/, @items);
     };
 
     while (1) {
