@@ -17,7 +17,7 @@ sub cmd_quit { say 'good bye!'; exit 0; }
 
 sub cmd_connect {
     my ($self, @args) = @_;
-    @args > 2 and die "too many parameters\n";
+    @args < 1 || @args > 2 and die "wrong number of arguments for 'connect' command\n";
     my $server = join(':', @args);
 
     my $redis = eval {
