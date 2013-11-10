@@ -1,10 +1,11 @@
-package CLI;
+package Redis::CLI;
 
 use 5.14.2;
 
 use Moo;
 use Redis;
 use Data::Dumper;
+use MooX::Options;
 use Term::ReadLine;
 
 has redis => (
@@ -15,13 +16,55 @@ before 'redis' => sub {
     die "not connected\n" if !$_[0]->{redis} && @_ == 1;
 };
 
+has term => (
+    is => 'lazy',
+);
+
 has sub_cmd_prefix => (
     is => 'ro',
     default => sub { 'cmd_' }
 );
 
-my @roles = map { s#/#::#g; s#\.pm##; $_ } glob('CLI/Role/*');
+has sub_autompletion_prefix => (
+    is => 'ro',
+    default => sub { 'completion_for_' }
+);
+
+has builtin_redis_cmds => (
+    is => 'ro',
+    default => sub {[
+        'ping', 'set', 'get', 'mget', 'incr', 'decr', 'exists', 'del', 'type', 'keys',
+        'randomkey', 'rename', 'dbsize', 'rpush', 'lpush', 'llen', 'lrange', 'ltrim',
+        'lindex', 'lset', 'lrem', 'lpop', 'rpop', 'sadd', 'srem', 'scard', 'sismember',
+        'sinter', 'sinterstore', 'select', 'move', 'flushdb', 'flushall', 'sort', 'save',
+        'bgsave', 'lastsave', 'shutdown', 'info'
+    ]}
+);
+
+option 'execute' => (
+    is => 'ro',
+    short => 'e',
+    format => 's',
+    documentation => 'Command to execute',
+);
+
+# loading plugins
+my @roles = map { s#/#::#g; s#\.pm##; $_ } glob('Redis/CLI/Role/*.pm');
 with $_ foreach (@roles);
+
+# main routines
+sub run {
+    my $self = shift;
+    $self->do_connect();
+
+    if ($self->execute) {
+        return $self->do_command($self->execute);
+    } else {
+        return $self->do_repl();
+    }
+}
+
+sub do_connect {}
 
 sub do_command {
     my ($self, $line) = @_;
@@ -37,6 +80,7 @@ sub do_command {
         } or do {
             my $error = $@ || 'zombie error';
             say $self->extract_error_message($error);
+            return 1;
         }
     } else {
         eval {
@@ -52,37 +96,52 @@ sub do_command {
         } or do {
             my $error = $@ || 'zombie error';
             say $self->extract_error_message($error);
+            return 1;
         }
     }
+
+    return 0;
 }
 
 sub do_repl {
-    my ($self, $server) = @_;
-    $self->cmd_connect($server);
-
-    my $term = Term::ReadLine->new('Perl redis_cli');
-    my $attr = $term->Attribs;
-    $term->ornaments(0);
+    my ($self) = @_;
+    my $attr = $self->term->Attribs;
 
     $attr->{completion_function} = sub {
         my ($text, $line, $start) = @_;
-        my @items = $start == 0
-                    ? @{ $self->all_cmds() }
-                    : eval { $self->redis->keys('*') };
+
+        my @items;
+        if ($start == 0) {
+            # do cmd autocompletion
+            @items = sort @{ $self->all_cmds() };
+        } else {
+            # do key autocompletion
+            my ($cmd) = split /\s+/, $line;
+            $cmd //= '';
+
+            my $completion_func_name = $self->sub_autompletion_prefix() . $cmd;
+            if ($self->can($completion_func_name)) {
+                my $res = $self->$completion_func_name($text, $line, $start);
+                @items = $res ? @{ $res } : ();
+            } else {
+                @items = eval { $self->redis->keys('*') };
+            }
+        }
 
         return grep(/^$text/, @items);
     };
 
     while (1) {
-        my $line = $term->readline('redis> ');
+        my $line = $self->term->readline('redis> ');
         last unless defined $line;
         next if $line =~ m/^\s*$/;
 
-        $term->addhistory($line);
+        $self->term->addhistory($line);
         $self->do_command($line);
     }
 }
 
+# utils
 sub print_result {
     my ($self, $result) = @_;
     return unless $result;
@@ -123,7 +182,7 @@ sub extract_error_message {
 sub all_cmds {
     my $self = shift;
     my @all_cmds = sort @{[
-        @{ $self->_all_redis_cmds() },
+        @{ $self->builtin_redis_cmds },
         @{ $self->_all_package_cmds() },
     ]};
 
@@ -138,8 +197,10 @@ sub _all_package_cmds {
     return \@cmds;
 }
 
-sub _all_redis_cmds {
-    return [];
+sub _build_term {
+    my $term = Term::ReadLine->new('Perl redis_cli');
+    $term->ornaments(0);
+    return $term;
 }
 
 1;

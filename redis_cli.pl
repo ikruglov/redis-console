@@ -3,5 +3,5 @@
 use strict;
 use warnings;
 
-use CLI;
-exit CLI->new()->do_repl('localhost:6379');
+use Redis::CLI;
+exit Redis::CLI->new_with_options()->run();
