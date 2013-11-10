@@ -26,7 +26,7 @@ sub cmd_fls {
 
 sub cmd_fgrep {
     my ($self, $queue, $pattern) = @_;
-    die "queue name required\n" unless $queue;
+    die "queue name required" unless $queue;
     $pattern //= '';
 
     my @items = grep( m/$pattern/, $self->redis->lrange($queue, 0, -1));

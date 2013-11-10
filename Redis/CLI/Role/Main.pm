@@ -27,7 +27,7 @@ around do_connect => sub {
 
 sub cmd_connect {
     my ($self, @args) = @_;
-    @args < 1 || @args > 2 and die "wrong number of arguments for 'connect' command\n";
+    @args < 1 || @args > 2 and die "wrong number of arguments for 'connect' command";
     my $server = join(':', @args);
 
     my $redis = eval {
@@ -37,7 +37,7 @@ sub cmd_connect {
         );
     } or do {
         my $error = $@ || "can't connect";
-        die $self->extract_error_message($error) . "\n";
+        die $self->extract_error_message($error);
     };
 
     $self->redis($redis);
