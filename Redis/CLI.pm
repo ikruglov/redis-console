@@ -7,6 +7,7 @@ use Redis;
 use Data::Dumper;
 use MooX::Options;
 use Term::ReadLine;
+use Text::ParseWords qw/parse_line/;
 
 has redis => (
     is => 'rw',
@@ -18,6 +19,11 @@ before 'redis' => sub {
 
 has term => (
     is => 'lazy',
+);
+
+has delimiters => (
+    is => 'rw',
+    default => sub { '\s+' },
 );
 
 has sub_cmd_prefix => (
@@ -69,7 +75,7 @@ sub do_connect {}
 sub do_command {
     my ($self, $line) = @_;
 
-    my ($cmd, @args) = split /\s+/, $line;
+    my ($cmd, @args) = parse_line($self->delimiters, 0, $line);
     return unless $cmd;
 
     my $cmd_name = $self->sub_cmd_prefix . $cmd;
