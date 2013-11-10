@@ -37,7 +37,7 @@ has builtin_redis_cmds => (
         'randomkey', 'rename', 'dbsize', 'rpush', 'lpush', 'llen', 'lrange', 'ltrim',
         'lindex', 'lset', 'lrem', 'lpop', 'rpop', 'sadd', 'srem', 'scard', 'sismember',
         'sinter', 'sinterstore', 'select', 'move', 'flushdb', 'flushall', 'sort', 'save',
-        'bgsave', 'lastsave', 'shutdown', 'info'
+        'bgsave', 'lastsave', 'shutdown', 'info',
     ]}
 );
 

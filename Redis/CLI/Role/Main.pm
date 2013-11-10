@@ -37,7 +37,7 @@ sub cmd_connect {
         );
     } or do {
         my $error = $@ || "can't connect";
-        die "$error\n";
+        die $self->extract_error_message($error) . "\n";
     };
 
     $self->redis($redis);
