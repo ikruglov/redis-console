@@ -1,0 +1,15 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+use Devel::REPL;
+
+my @plugins = (
+    'History',
+    #'LexEnv',
+);
+
+my $repl = Devel::REPL->new();
+$repl->prompt('redis> ');
+$repl->load_plugin($_) for (@plugins);
+exit $repl->run();
