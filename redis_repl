@@ -6,10 +6,12 @@ use Devel::REPL;
 
 my @plugins = (
     'History',
+    'RedisConsole',
     #'LexEnv',
 );
 
 my $repl = Devel::REPL->new();
 $repl->prompt('redis> ');
 $repl->load_plugin($_) for (@plugins);
-exit $repl->run();
+$repl->run();
+exit 0;
