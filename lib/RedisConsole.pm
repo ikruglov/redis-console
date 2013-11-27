@@ -79,22 +79,15 @@ sub execute {
     my ($cmd, @args) = parse_line($self->delimiters, 0, $line);
     return 1 unless $cmd;
 
-    my $cmd_name = $self->sub_cmd_prefix . $cmd;
-    if ($self->can($cmd_name)) {
-        return $self->eval(sub { $self->$cmd_name(@args) });
-    } else {
-        return $self->eval(sub { $self->redis->$cmd(@args) });
-    }
-}
-
-sub cmd_test { shift->print('TEST'); }
-
-sub eval {
-    my ($self, $cmd) = @_;
-
     my $res = 1;
     eval {
-        $res = $cmd->();
+        my $cmd_name = $self->sub_cmd_prefix . $cmd;
+        if ($self->can($cmd_name)) {
+            $res = $self->$cmd_name(@args);
+        } else {
+            $res = $self->redis->$cmd(@args);
+        }
+
         1;
     } or do {
         my $error = $@ || 'zombie error';
@@ -103,6 +96,7 @@ sub eval {
     };
 
     return $res;
+
 }
 
 sub print {
