@@ -1,29 +1,16 @@
-package Redis::CLI::Role::Main;
+package RedisConsole::Commands::Connect;
 
 use 5.14.2;
+use strict;
+use warnings;
 use Moo::Role;
-use MooX::Options;
 
-option 'host' => (
-    is => 'ro',
-    short => 'h',
-    format => 's',
-    documentation => 'Server hostname',
-);
-
-option 'port' => (
-    is => 'ro',
-    short => 'p',
-    format => 'i',
-    documentation => 'Server port',
-);
-
-around do_connect => sub {
-    my ($orig, $self) = @_;
-    if ($self->host && $self->port) {
-        $self->cmd_connect($self->host, $self->port);
-    }
-};
+#around do_connect => sub {
+#    my ($orig, $self) = @_;
+#    if ($self->host && $self->port) {
+#        $self->cmd_connect($self->host, $self->port);
+#    }
+#};
 
 sub cmd_connect {
     my ($self, @args) = @_;

@@ -1,0 +1,30 @@
+#!/usr/bin/perl
+
+use strict;
+use warnings;
+
+use RedisConsole;
+use Getopt::Long::Descriptive;
+
+my ($opt, $usage) = describe_options(
+    'redis-console %o',
+    [ 'host|h=s',       'Server hostname (default: 127.0.0.1)',   { default  => '127.0.0.1' } ],
+    [ 'port|p=i',       'Server port (default: 6379)',            { default  => 6379 }        ],
+    [ 'execute|e=s',    'Execute Redis command'                                               ],
+    [                                                                                         ],
+    [ 'help',           'print usage message and exit'                                        ],
+);
+
+if ($opt->help) {
+    print $usage->text;
+    exit 1;
+}
+
+my $rc = RedisConsole->new(name => 'redis-console');
+#$rc->cmd_connect($opt->host, $opt->port);
+
+if ($opt->execute) {
+    exit $rc->execute($opt->execute);
+}
+
+exit $rc->repl();

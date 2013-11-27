@@ -40,7 +40,7 @@ around 'eval' => sub {
         my $cmd_name = $self->sub_cmd_prefix . $cmd;
         if ($self->can($cmd_name)) {
             return $self->$cmd_name(@args);
-        } elsif (exists $self->builtin_redis_cmds->{$cmd}) {
+        } else {
         }
     }
 

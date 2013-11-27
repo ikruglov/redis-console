@@ -1,4 +1,4 @@
-package Redis::CLI::Role::FIFO;
+package RedisConsole::Commands::ReliableFIFO;
 
 use JSON;
 use Moo::Role;
@@ -11,6 +11,7 @@ has all_queue_types => (
 
 sub cmd_fls {
     my ($self, $queue, $len) = @_;
+    print "111\n";
 
     if (defined $queue) {
         my @items = $self->redis->lrange($queue, 0, int($len || 10));
