@@ -21,10 +21,7 @@ if ($opt->help) {
 }
 
 my $rc = RedisConsole->new(name => 'redis-console');
-#$rc->cmd_connect($opt->host, $opt->port);
+die 'dont know how to connect' unless $rc->can('cmd_connect');
+$rc->cmd_connect($opt->host, $opt->port);
 
-if ($opt->execute) {
-    exit $rc->execute($opt->execute);
-}
-
-exit $rc->repl();
+exit($opt->execute ? $rc->execute($opt->execute) : $rc->repl());

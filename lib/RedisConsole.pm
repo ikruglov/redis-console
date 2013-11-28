@@ -16,6 +16,7 @@ has name => ( is => 'ro' );
 has prompt => (
     is => 'rw',
     default => sub { 'redis> ' },
+    coerce => sub { defined $_[0] ? $_[0] : 'redis> ' },
 );
 
 has term => (
@@ -79,30 +80,44 @@ sub execute {
     my ($cmd, @args) = parse_line($self->delimiters, 0, $line);
     return 1 unless $cmd;
 
-    my $res = 1;
+    my @res;
     eval {
         my $cmd_name = $self->sub_cmd_prefix . $cmd;
         if ($self->can($cmd_name)) {
-            $res = $self->$cmd_name(@args);
+            @res = $self->$cmd_name(@args);
         } else {
-            $res = $self->redis->$cmd(@args);
+            @res = $self->redis->$cmd(@args);
         }
 
         1;
     } or do {
         my $error = $@ || 'zombie error';
         chomp $error;
-        $self->print($error);
+        $self->print($self->extract_error_message($error));
+        return 1;
     };
 
-    return $res;
-
+    #@res and $self->print(@res);
+    return 0;
 }
 
 sub print {
-  my ($self, $message) = @_;
-  print { $self->out_fh } $message;
+  my ($self, @message) = @_;
+  print { $self->out_fh } @message;
   print { $self->out_fh } "\n" if $self->term->ReadLine =~ /Gnu/;
+}
+
+# need to extract error message
+# since Redis.pm always does confess instead of croak
+sub extract_error_message {
+    my ($self, $message) = @_;
+    my ($first_line) = split("\n", $message);
+
+    my $pos = rindex($first_line, ' at ');
+    $pos <= 0 and return $message;
+
+    my $error = substr($first_line, 0, $pos);
+    return $error =~ m/^\[[^\]]+\]\s+ERR\s+(.+)/ ? $1 : $error;
 }
 
 #    my $attr = $self->term->Attribs;
@@ -148,60 +163,46 @@ sub print {
 
 
 # utils
-sub print_result {
-    my ($self, $result) = @_;
-    return unless $result;
-
-    my $ref = ref $result;
-    if (!$ref) {
-        print $result;
-    } elsif ($ref eq 'ARRAY') {
-        my $len = scalar @$result;
-        if ($len == 1 ) {
-            $self->print_result($result->[0]);
-        } elsif ($len > 1) {
-            my $i = 0;
-            foreach (sort @$result) {
-                print ++$i, ') ', $_, "\n";
-            }
-        }
-    } else {
-        print Dumper $result;
-    }
-}
-
-# need to extract error message
-# since Redis.pm always does confess instead of croak
-sub extract_error_message {
-    my ($self, $message) = @_;
-    my ($first_line) = split("\n", $message);
-    my $pos = rindex($first_line, ' at ');
-
-    if ($pos > 0) {
-        my $error = substr($first_line, 0, $pos);
-        return $error =~ m/^\[[^\]]+\]\s+ERR\s+(.+)/ ? $1 : $error;
-    }
-
-    return $message;
-}
-
-sub all_cmds {
-    my $self = shift;
-    my @all_cmds = sort @{[
-        @{ $self->builtin_redis_cmds },
-        @{ $self->_all_package_cmds() },
-    ]};
-
-    return \@all_cmds;
-}
-
-sub _all_package_cmds {
-    no strict 'refs';
-    my $self = shift;
-    my $prefix = $self->sub_cmd_prefix;
-    my @cmds = map { m/^$prefix(.+)/ ? $1 : () } keys %{ ref($self) . '::' };
-    return \@cmds;
-}
+#sub print_result {
+#    my ($self, $result) = @_;
+#    return unless $result;
+#
+#    my $ref = ref $result;
+#    if (!$ref) {
+#        print $result;
+#    } elsif ($ref eq 'ARRAY') {
+#        my $len = scalar @$result;
+#        if ($len == 1 ) {
+#            $self->print_result($result->[0]);
+#        } elsif ($len > 1) {
+#            my $i = 0;
+#            foreach (sort @$result) {
+#                print ++$i, ') ', $_, "\n";
+#            }
+#        }
+#    } else {
+#        print Dumper $result;
+#    }
+#}
+#
+#
+#sub all_cmds {
+#    my $self = shift;
+#    my @all_cmds = sort @{[
+#        @{ $self->builtin_redis_cmds },
+#        @{ $self->_all_package_cmds() },
+#    ]};
+#
+#    return \@all_cmds;
+#}
+#
+#sub _all_package_cmds {
+#    no strict 'refs';
+#    my $self = shift;
+#    my $prefix = $self->sub_cmd_prefix;
+#    my @cmds = map { m/^$prefix(.+)/ ? $1 : () } keys %{ ref($self) . '::' };
+#    return \@cmds;
+#}
 
 
 1;
