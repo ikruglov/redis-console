@@ -20,7 +20,7 @@ sub cmd_connect {
     die "failed to connect\n" unless $self->connected;
 
     $self->server($server);
-    $self->prompt("$server > ");
+    $self->prompt("$server> ");
     $self->print("hello $server") if $self->repl_mode;
 }
 

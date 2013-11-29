@@ -66,6 +66,7 @@ has repl_mode => (
 sub repl {
     my ($self) = @_;
     $self->repl_mode(1);
+    $self->term->ornaments(0);
 
     while (not $self->exit_repl) {
         my $line = $self->term->readline($self->prompt);

@@ -8,11 +8,12 @@ use Getopt::Long::Descriptive;
 
 my ($opt, $usage) = describe_options(
     'redis-console %o',
-    [ 'host|h=s',       'Server hostname (default: 127.0.0.1)',   { default  => '127.0.0.1' } ],
-    [ 'port|p=i',       'Server port (default: 6379)',            { default  => 6379 }        ],
-    [ 'execute|e=s',    'Execute Redis command'                                               ],
-    [                                                                                         ],
-    [ 'help',           'print usage message and exit'                                        ],
+    [ 'host|h=s',       'Server hostname (default: 127.0.0.1)',    { default  => '127.0.0.1' }                ],
+    [ 'port|p=i',       'Server port (default: 6379)',             { default  => 6379 }                       ],
+    [ 'execute|e=s',    'Execute Redis command'                                                               ],
+    [ 'conf|c=s',       'Config file (default: ~/.redis-console)', { default => "$ENV{HOME}/.redis-console" } ],
+    [                                                                                                         ],
+    [ 'help',           'print usage message and exit'                                                        ],
 );
 
 if ($opt->help) {
@@ -22,6 +23,24 @@ if ($opt->help) {
 
 my $rc = RedisConsole->new(name => 'redis-console');
 die 'dont know how to connect' unless $rc->can('cmd_connect');
-$rc->cmd_connect($opt->host, $opt->port);
 
-exit($opt->execute ? $rc->execute($opt->execute) : $rc->repl());
+my $conf_file = $opt->conf;
+if ($opt->host && $opt->port) {
+    $rc->cmd_connect($opt->host, $opt->port);
+} elsif (-f $conf_file) {
+    # TODO
+}
+
+if ($opt->execute) {
+    exit($rc->execute($opt->execute));
+}
+
+my $hist_file = $opt->conf . '-history';
+if (open(my $fh, '<', $hist_file)) {
+    $rc->term->addhistory($_) while (<$fh>);
+}
+
+my $res = $rc->repl();
+
+exit $res;
+
