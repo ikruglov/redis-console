@@ -59,8 +59,13 @@ has sub_cmd_prefix => (
     default => sub { 'cmd_' }
 );
 
+has repl_mode => (
+    is => 'rw',
+);
+
 sub repl {
     my ($self) = @_;
+    $self->repl_mode(1);
 
     while (not $self->exit_repl) {
         my $line = $self->term->readline($self->prompt);
@@ -80,13 +85,12 @@ sub execute {
     my ($cmd, @args) = parse_line($self->delimiters, 0, $line);
     return 1 unless $cmd;
 
-    my @res;
     eval {
         my $cmd_name = $self->sub_cmd_prefix . $cmd;
         if ($self->can($cmd_name)) {
-            @res = $self->$cmd_name(@args);
+            $self->$cmd_name(@args);
         } else {
-            @res = $self->redis->$cmd(@args);
+            $self->redis->$cmd(@args);
         }
 
         1;
@@ -97,14 +101,15 @@ sub execute {
         return 1;
     };
 
-    #@res and $self->print(@res);
     return 0;
 }
 
 sub print {
-  my ($self, @message) = @_;
-  print { $self->out_fh } @message;
-  print { $self->out_fh } "\n" if $self->term->ReadLine =~ /Gnu/;
+    my ($self, @message) = @_;
+    print { $self->out_fh } "@message";
+    if (!$self->repl_mode || $self->term->ReadLine =~ /Gnu/) {
+        print { $self->out_fh } "\n";
+    }
 }
 
 # need to extract error message

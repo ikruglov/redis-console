@@ -6,9 +6,8 @@ use Moo::Role;
 
 sub cmd_exit {
     my $self = shift;
-    $self->print("good bye!\n");
     $self->exit_repl(1);
-    return 0;
+    $self->print("good bye!\n");
 }
 
 sub cmd_quit {

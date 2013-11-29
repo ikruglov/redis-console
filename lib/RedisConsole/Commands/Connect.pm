@@ -21,7 +21,7 @@ sub cmd_connect {
 
     $self->server($server);
     $self->prompt("$server > ");
-    $self->print("hello $server");
+    $self->print("hello $server") if $self->repl_mode;
 }
 
 sub cmd_disconnect {
@@ -29,7 +29,7 @@ sub cmd_disconnect {
     $self->redis(undef);
     $self->server(undef);
     $self->prompt(undef);
-    $self->print('disconnected');
+    $self->print('disconnected') if $self->repl_mode;
 }
 
 sub cmd_open { shift->cmd_connect(@_) }
