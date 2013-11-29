@@ -8,12 +8,13 @@ use Getopt::Long::Descriptive;
 
 my ($opt, $usage) = describe_options(
     'redis-console %o',
-    [ 'host|h=s',       'Server hostname (default: 127.0.0.1)',    { default  => '127.0.0.1' }                ],
-    [ 'port|p=i',       'Server port (default: 6379)',             { default  => 6379 }                       ],
-    [ 'execute|e=s',    'Execute Redis command'                                                               ],
-    [ 'conf|c=s',       'Config file (default: ~/.redis-console)', { default => "$ENV{HOME}/.redis-console" } ],
-    [                                                                                                         ],
-    [ 'help',           'print usage message and exit'                                                        ],
+    [ 'host|h=s',       'Server hostname (default: 127.0.0.1)',    { default  => '127.0.0.1' } ],
+    [ 'port|p=i',       'Server port (default: 6379)',             { default  => 6379 }        ],
+    [ 'execute|e=s',    'Execute Redis command'                                                ],
+    [ 'conf|c=s',       'Config file (default: ~/.redis-console)',
+                        { default => "$ENV{HOME}/.redis-console" } ],
+    [                                                                                          ],
+    [ 'help',           'print usage message and exit'                                         ],
 );
 
 if ($opt->help) {
@@ -31,16 +32,28 @@ if ($opt->host && $opt->port) {
     # TODO
 }
 
-if ($opt->execute) {
-    exit($rc->execute($opt->execute));
-}
+# short cut in run command from command line
+$opt->execute and exit($rc->execute($opt->execute));
 
 my $hist_file = $opt->conf . '-history';
-if (open(my $fh, '<', $hist_file)) {
-    $rc->term->addhistory($_) while (<$fh>);
-}
+read_history($rc, $hist_file);
 
 my $res = $rc->repl();
+dump_history($hist_file, $rc->history);
 
 exit $res;
 
+# additional routines
+sub read_history {
+    my ($rc, $file) = @_;
+    if (open(my $fh, '<', $file)) {
+        chomp, $rc->add_history($_) while (<$fh>);
+    }
+}
+
+sub dump_history {
+    my ($file, $history) = @_;
+    my $fh;
+    open($fh, '>', $file) and
+        print $fh join("\n", @$history);
+}

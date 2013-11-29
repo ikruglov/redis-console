@@ -63,6 +63,11 @@ has repl_mode => (
     is => 'rw',
 );
 
+has history => (
+    is => 'rw',
+    default => sub {[]},
+);
+
 sub repl {
     my ($self) = @_;
     $self->repl_mode(1);
@@ -73,7 +78,7 @@ sub repl {
         last unless defined $line;
         next if $line =~ m/^\s*$/;
 
-        $self->term->addhistory($line);
+        $self->add_history($line, 1);
         $self->execute($line);
     }
 
@@ -98,7 +103,7 @@ sub execute {
     } or do {
         my $error = $@ || 'zombie error';
         chomp $error;
-        $self->print($self->extract_error_message($error));
+        $self->print($self->_extract_error_message($error));
         return 1;
     };
 
@@ -113,9 +118,20 @@ sub print {
     }
 }
 
+sub add_history {
+    my ($self, $line, $not_add_to_term) = @_;
+    my @lines = ref $line ? @$line : $line;
+    push @{ $self->history }, @lines;
+
+    if (not $not_add_to_term) {
+        $self->term->addhistory($_) foreach @lines;
+    }
+}
+
+# additional staff
 # need to extract error message
 # since Redis.pm always does confess instead of croak
-sub extract_error_message {
+sub _extract_error_message {
     my ($self, $message) = @_;
     my ($first_line) = split("\n", $message);
 
