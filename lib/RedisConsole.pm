@@ -6,10 +6,9 @@ use warnings;
 
 use Moo;
 use Redis;
-use MooX::Roles::Pluggable search_path => 'RedisConsole::Commands';
-use Text::ParseWords qw/parse_line/;
 use Term::ReadLine;
-use Data::Dumper;
+use Text::ParseWords qw/parse_line/;
+use MooX::Roles::Pluggable search_path => 'RedisConsole::Commands';
 
 has name => ( is => 'ro' );
 
@@ -112,7 +111,10 @@ sub execute {
 
 sub print {
     my ($self, @message) = @_;
-    print { $self->out_fh } "@message";
+    my $text = "@message";
+    return unless $text;
+
+    print { $self->out_fh } $text;
     if (!$self->repl_mode || $self->term->ReadLine =~ /Gnu/) {
         print { $self->out_fh } "\n";
     }
@@ -121,10 +123,11 @@ sub print {
 sub add_history {
     my ($self, $line, $not_add_to_term) = @_;
     my @lines = ref $line ? @$line : $line;
-    push @{ $self->history }, @lines;
 
-    if (not $not_add_to_term) {
-        $self->term->addhistory($_) foreach @lines;
+    foreach my $line (@lines) {
+        next if @{ $self->history } && $self->history->[-1] eq $line;
+        push @{ $self->history }, $line;
+        $self->term->addhistory($line) unless $not_add_to_term;
     }
 }
 

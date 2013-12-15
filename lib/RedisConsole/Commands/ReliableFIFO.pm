@@ -10,18 +10,16 @@ has all_queue_types => (
 );
 
 sub cmd_fls {
-    my ($self, $queue, $len) = @_;
-    print "111\n";
+    my ($self, $queue) = @_;
 
     if (defined $queue) {
-        my @items = $self->redis->lrange($queue, 0, int($len || 10));
-        $self->print_result(\@items);
+        my @items = $self->redis->lrange($queue, 0, int(10));
+        #$self->print_result(\@items);
     } else {
         my @queues = map {
             sprintf("%-40s %d items", $_, int($self->redis->llen($_)))
         } sort $self->_get_all_queues();
-
-        $self->print_result(\@queues);
+        $self->print(@queues);
     }
 }
 
@@ -34,17 +32,18 @@ sub cmd_fgrep {
     $self->print_result(\@items);
 }
 
-sub completion_for_fls   { _queue_completion(@_); }
-sub completion_for_fgrep { _queue_completion(@_); }
-
-sub _queue_completion {
-    my @queues = sort $_[0]->_get_all_queues();
-    return \@queues;
-}
-
 sub _get_all_queues {
     my $self = shift;
     return map { $self->redis->keys("*_$_") } @{ $self->all_queue_types };
 }
 
 1;
+
+#
+#sub completion_for_fls   { _queue_completion(@_); }
+#sub completion_for_fgrep { _queue_completion(@_); }
+#
+#sub _queue_completion {
+#    my @queues = sort $_[0]->_get_all_queues();
+#    return \@queues;
+#}

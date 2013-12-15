@@ -33,27 +33,29 @@ if ($opt->host && $opt->port) {
 }
 
 # short cut in run command from command line
-$opt->execute and exit($rc->execute($opt->execute));
+if ($opt->execute) {
+    exit($rc->execute($opt->execute));
+}
 
 my $hist_file = $opt->conf . '-history';
-read_history($rc, $hist_file);
+if (open(my $fh, '<', $hist_file)) {
+    chomp, $rc->add_history($_) while (<$fh>);
+    close($fh);
+}
+
+$SIG{INT} = $SIG{TERM} = sub {
+    dump_history($hist_file, $rc->history);
+    exit 0;
+};
 
 my $res = $rc->repl();
 dump_history($hist_file, $rc->history);
-
 exit $res;
-
-# additional routines
-sub read_history {
-    my ($rc, $file) = @_;
-    if (open(my $fh, '<', $file)) {
-        chomp, $rc->add_history($_) while (<$fh>);
-    }
-}
 
 sub dump_history {
     my ($file, $history) = @_;
-    my $fh;
-    open($fh, '>', $file) and
-        print $fh join("\n", @$history);
+    if (open(my $fh, '>', $file)) {
+        print $fh join("\n", @{ $history });
+        close($fh);
+    }
 }

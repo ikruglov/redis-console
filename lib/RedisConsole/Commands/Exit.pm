@@ -7,7 +7,7 @@ use Moo::Role;
 sub cmd_exit {
     my $self = shift;
     $self->exit_repl(1);
-    $self->print("good bye!\n");
+    $self->print("good bye!\n") if $self->repl_mode;;
 }
 
 sub cmd_quit {
