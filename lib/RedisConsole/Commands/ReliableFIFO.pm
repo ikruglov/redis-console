@@ -25,11 +25,30 @@ sub cmd_fls {
 
 sub cmd_fgrep {
     my ($self, $queue, $pattern) = @_;
-    die "queue name required" unless $queue;
+    die "queue name required\n" unless $queue;
     $pattern //= '';
 
     my @items = grep( m/$pattern/, $self->redis->lrange($queue, 0, -1));
     $self->print_result(\@items);
+}
+
+sub cmd_fdump {
+    my ($self, $queue, $file) = @_;
+    die "queue name required\n" unless $queue;
+    die "file name required\n" unless $file;
+
+    my @items = $self->redis->lrange($queue, 0, -1);
+    my $len = scalar @items;
+
+    $self->print("dumping $len items to file '$file'") if $self->repl_mode;
+    open(my $fh, '>', $file) or die "failed to open file: $!\n";
+    print $fh join("\n", @items);
+    close($fh);
+}
+
+sub cmd_freorder {
+    my ($self, $queue, $order) = @_;
+    die "queue name required\n" unless $queue;
 }
 
 sub _get_all_queues {
