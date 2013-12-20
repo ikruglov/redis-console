@@ -67,10 +67,30 @@ has history => (
     default => sub {[]},
 );
 
+has builtin_redis_cmds => (
+    is => 'ro',
+    default => sub {[
+        'ping', 'set', 'get', 'mget', 'incr', 'decr', 'exists', 'del', 'type', 'keys',
+        'randomkey', 'rename', 'dbsize', 'rpush', 'lpush', 'llen', 'lrange', 'ltrim',
+        'lindex', 'lset', 'lrem', 'lpop', 'rpop', 'sadd', 'srem', 'scard', 'sismember',
+        'sinter', 'sinterstore', 'select', 'move', 'flushdb', 'flushall', 'sort', 'save',
+        'bgsave', 'lastsave', 'shutdown', 'info',
+    ]}
+);
+
 sub repl {
     my ($self) = @_;
     $self->repl_mode(1);
     $self->term->ornaments(0);
+
+    my $attr = $self->term->Attribs;
+    $attr->{completion_function} = sub {
+        my ($text, $line, $start) = @_;
+        return if $start; # do cmd autocompletion only
+
+        my @items = sort $self->all_cmds();
+        return grep(/^$text/, @items);
+    };
 
     while (not $self->exit_repl) {
         my $line = $self->term->readline($self->prompt);
@@ -86,8 +106,17 @@ sub repl {
 
 sub execute {
     my ($self, $line) = @_;
+    return 1 unless $line;
+
+    $line=~ s/^\s+//;
+    $line=~ s/\s+$//;
 
     my ($cmd, @args) = parse_line($self->delimiters, 0, $line);
+    return $self->execute_command($cmd, @args);
+}
+
+sub execute_command {
+    my ($self, $cmd, @args) = @_;
     return 1 unless $cmd;
 
     eval {
@@ -131,6 +160,12 @@ sub add_history {
     }
 }
 
+sub all_cmds {
+    my $self = shift;
+    my %cmds = map { $_ => 1 } $self->_all_package_cmds(), @{$self->builtin_redis_cmds};
+    return wantarray ? keys %cmds : scalar keys %cmds;
+}
+
 # additional staff
 # need to extract error message
 # since Redis.pm always does confess instead of croak
@@ -143,6 +178,14 @@ sub _extract_error_message {
 
     my $error = substr($first_line, 0, $pos);
     return $error =~ m/^\[[^\]]+\]\s+ERR\s+(.+)/ ? $1 : $error;
+}
+
+sub _all_package_cmds {
+    no strict 'refs';
+    my $self = shift;
+    my $prefix = $self->sub_cmd_prefix;
+    my @cmds = map { m/^$prefix(.+)/ ? $1 : () } keys %{ ref($self) . '::' };
+    return wantarray ? @cmds : scalar @cmds;
 }
 
 #    my $attr = $self->term->Attribs;
@@ -175,59 +218,5 @@ sub _extract_error_message {
 #    default => sub { 'completion_for_' }
 #);
 #
-#has builtin_redis_cmds => (
-#    is => 'ro',
-#    default => sub {[
-#        'ping', 'set', 'get', 'mget', 'incr', 'decr', 'exists', 'del', 'type', 'keys',
-#        'randomkey', 'rename', 'dbsize', 'rpush', 'lpush', 'llen', 'lrange', 'ltrim',
-#        'lindex', 'lset', 'lrem', 'lpop', 'rpop', 'sadd', 'srem', 'scard', 'sismember',
-#        'sinter', 'sinterstore', 'select', 'move', 'flushdb', 'flushall', 'sort', 'save',
-#        'bgsave', 'lastsave', 'shutdown', 'info',
-#    ]}
-#);
-
-
-# utils
-#sub print_result {
-#    my ($self, $result) = @_;
-#    return unless $result;
-#
-#    my $ref = ref $result;
-#    if (!$ref) {
-#        print $result;
-#    } elsif ($ref eq 'ARRAY') {
-#        my $len = scalar @$result;
-#        if ($len == 1 ) {
-#            $self->print_result($result->[0]);
-#        } elsif ($len > 1) {
-#            my $i = 0;
-#            foreach (sort @$result) {
-#                print ++$i, ') ', $_, "\n";
-#            }
-#        }
-#    } else {
-#        print Dumper $result;
-#    }
-#}
-#
-#
-#sub all_cmds {
-#    my $self = shift;
-#    my @all_cmds = sort @{[
-#        @{ $self->builtin_redis_cmds },
-#        @{ $self->_all_package_cmds() },
-#    ]};
-#
-#    return \@all_cmds;
-#}
-#
-#sub _all_package_cmds {
-#    no strict 'refs';
-#    my $self = shift;
-#    my $prefix = $self->sub_cmd_prefix;
-#    my @cmds = map { m/^$prefix(.+)/ ? $1 : () } keys %{ ref($self) . '::' };
-#    return \@cmds;
-#}
-
 
 1;

@@ -27,7 +27,7 @@ die 'dont know how to connect' unless $rc->can('cmd_connect');
 
 my $conf_file = $opt->conf;
 if ($opt->host && $opt->port) {
-    $rc->cmd_connect($opt->host, $opt->port);
+    $rc->execute_command('connect', $opt->host, $opt->port);
 } elsif (-f $conf_file) {
     # TODO
 }

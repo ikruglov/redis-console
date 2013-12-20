@@ -8,6 +8,7 @@ has server => ( is => 'rw' );
 
 sub cmd_connect {
     my ($self, @args) = @_;
+
     @args < 1 || @args > 2 and die "wrong number of arguments for 'connect' command";
     my $server = join(':', @args);
 
