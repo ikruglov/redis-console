@@ -10,7 +10,7 @@ my ($opt, $usage) = describe_options(
     'redis-console %o',
     [ 'host|h=s',       'Server hostname (default: 127.0.0.1)',    { default  => '127.0.0.1' } ],
     [ 'port|p=i',       'Server port (default: 6379)',             { default  => 6379 }        ],
-    [ 'execute|e=s',    'Execute Redis command'                                                ],
+    [ 'execute|e=s@',   'Execute Redis command (or commands)'                                  ],
     [ 'conf|c=s',       'Config file (default: ~/.redis-console)',
                         { default => "$ENV{HOME}/.redis-console" } ],
     [                                                                                          ],
@@ -34,7 +34,12 @@ if ($opt->host && $opt->port) {
 
 # short cut in run command from command line
 if ($opt->execute) {
-    exit($rc->execute($opt->execute));
+    my $res = 0;
+    foreach my $line (@{ $opt->execute }) {
+        $res = $rc->execute($line);
+    }
+
+    exit($res);
 }
 
 my $hist_file = $opt->conf . '-history';
