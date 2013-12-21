@@ -4,23 +4,47 @@ use JSON;
 use Moo::Role;
 use Data::Dumper;
 
+has fformat => (
+    is => 'rw',
+    default => sub { 'raw' },
+);
+
 has all_queue_types => (
     is => 'ro',
     default => sub {[ 'main', 'busy', 'failed' ]},
 );
 
-sub cmd_fls {
-    my ($self, $queue) = @_;
+sub cmd_fformat {
+    my ($self, $format) = @_;
+    if (defined $format) {
+        # validate input
+        $self->fformat($format);
+    }
 
+    $self->print("ReliableFIFO output format: " . $self->fformat);
+}
+
+sub cmd_fls {
+    my ($self, $queue, $p1, $p2) = @_;
+
+    my @items;
     if (defined $queue) {
-        my @items = $self->redis->lrange($queue, 0, int(10));
-        #$self->print_result(\@items);
+        my ($start, $stop) = (0, 10);
+        if (defined $p1 && defined $p2) {
+            ($start, $stop) = (int $p1 , int $p2);
+        } elsif (defined $p1) {
+            ($start, $stop) = (0, int $p1);
+        }
+
+        my $raw_items = $self->redis->lrange($queue, $start, $stop);
+        @items = @{ $self->_format($raw_items) };
     } else {
-        my @queues = map {
+        @items = map {
             sprintf("%-40s %d items", $_, int($self->redis->llen($_)))
         } sort $self->_get_all_queues();
-        $self->print(@queues);
     }
+
+    $self->print(join("\n", @items));
 }
 
 sub cmd_fgrep {
@@ -28,8 +52,8 @@ sub cmd_fgrep {
     die "queue name required\n" unless $queue;
     $pattern //= '';
 
-    my @items = grep( m/$pattern/, $self->redis->lrange($queue, 0, -1));
-    $self->print_result(\@items);
+    my @raw_items = grep( m/$pattern/, $self->redis->lrange($queue, 0, -1));
+    $self->print(join("\n", @{ $self->_format(\@raw_items) }));
 }
 
 sub cmd_fdump {
@@ -51,9 +75,46 @@ sub cmd_freorder {
     die "queue name required\n" unless $queue;
 }
 
+##################################
+# internal routines
+#################################
+
 sub _get_all_queues {
     my $self = shift;
     return map { $self->redis->keys("*_$_") } @{ $self->all_queue_types };
+}
+
+sub _format {
+    my ($self, $raw_items) = @_;
+
+    if ($self->fformat eq 'raw') {
+        return $raw_items;
+    } elsif ($self->fformat eq 'hdp') {
+        my @items = map {
+            my $json = JSON::decode_json($_);
+            my $error = $json->{error} // '';
+            $error =~ s/^error importing \d{10} - \d{10}: //;
+            $error =~ s/\s+/ /g;
+
+            sprintf(
+                '%-15s %-25s %-15s %-30s %-10s %-100s',
+                $json->{b}->{epoch},
+                $json->{b}->{epoch_humanized},
+                join(',', @{ $json->{b}->{dc} // ['none'] }),
+                join(',', @{ $json->{b}->{type} // ['none'] }),
+                $json->{b}->{force} // 0,
+                $self->_extract_error_message($error),
+            );
+        } @{ $raw_items };
+
+        unshift @items, sprintf("%-15s %-25s %-15s %-30s %-10s %-100s",
+                                '<epoch>', '<epoch_humanized>',
+                                '<dc>', '<type>', '<force>', '<error>');
+
+        return \@items;
+    } else {
+        die 'unknown _fls_type';
+    }
 }
 
 1;
