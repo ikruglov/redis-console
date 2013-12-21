@@ -124,7 +124,8 @@ sub execute_command {
         if ($self->can($cmd_name)) {
             $self->$cmd_name(@args);
         } else {
-            $self->redis->$cmd(@args);
+            my $res = $self->redis->$cmd(@args);
+            $res and $self->print($res);
         }
 
         1;

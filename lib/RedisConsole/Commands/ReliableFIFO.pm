@@ -9,6 +9,11 @@ has fformat => (
     default => sub { 'raw' },
 );
 
+has fdryrun => (
+    is => 'rw',
+    default => sub { 0 },
+);
+
 has all_queue_types => (
     is => 'ro',
     default => sub {[ 'main', 'busy', 'failed' ]},
@@ -19,9 +24,21 @@ sub cmd_fformat {
     if (defined $format) {
         # validate input
         $self->fformat($format);
+        $self->repl_mode and $self->print("ReliableFIFO output format: " . $self->fformat);
+    } else {
+        $self->print("ReliableFIFO output format: " . $self->fformat);
     }
+}
 
-    $self->print("ReliableFIFO output format: " . $self->fformat);
+sub cmd_fdryrun {
+    my ($self, $dryrun) = @_;
+    if (defined $dryrun) {
+        $self->fdryrun($dryrun eq 'on' ? 1 : 0);
+        $self->repl_mode
+            and $self->print("ReliableFIFO dryrun mode: " . ($self->fdryrun ? 'on' : 'off'));
+    } else {
+        $self->print("ReliableFIFO dryrun mode: " . ($self->fdryrun ? 'on' : 'off'));
+    }
 }
 
 sub cmd_fls {
@@ -50,10 +67,11 @@ sub cmd_fls {
 sub cmd_fgrep {
     my ($self, $queue, $pattern) = @_;
     die "queue name required\n" unless $queue;
-    $pattern //= '';
+    die "pattern required\n" unless $pattern;
 
-    my @raw_items = grep( m/$pattern/, $self->redis->lrange($queue, 0, -1));
-    $self->print(join("\n", @{ $self->_format(\@raw_items) }));
+    my $raw_items = $self->redis->lrange($queue, 0, -1);
+    my $filtered_items = $self->_filter($raw_items, $pattern);
+    $self->print(join("\n", @$filtered_items));
 }
 
 sub cmd_fdump {
@@ -61,13 +79,37 @@ sub cmd_fdump {
     die "queue name required\n" unless $queue;
     die "file name required\n" unless $file;
 
-    my @items = $self->redis->lrange($queue, 0, -1);
-    my $len = scalar @items;
+    my $raw_items = $self->redis->lrange($queue, 0, -1);
+    my $len = scalar @$raw_items;
 
     $self->print("dumping $len items to file '$file'") if $self->repl_mode;
     open(my $fh, '>', $file) or die "failed to open file: $!\n";
-    print $fh join("\n", @items);
+    print $fh join("\n", @{ $self->_format($raw_items) });
     close($fh);
+}
+
+sub cmd_fdel {
+    my ($self, $queue, $pattern) = @_;
+    die "queue name required\n" unless $queue;
+    die "pattern required\n" unless $pattern;
+
+    my $raw_items = $self->redis->lrange($queue, 0, -1);
+    my $to_delete = $self->_filter($raw_items, $pattern);
+
+    if ($self->fdryrun) {
+        $self->print(join("\n", @{ $self->_format($to_delete) }));
+
+        my $num_deleted = scalar @$to_delete;
+        $self->print("\n") if $num_deleted;
+        $self->print("Deleted $num_deleted items (dryrun)");
+    } else {
+        my $num_deleted = 0;
+        foreach my $value (@$to_delete) {
+            $num_deleted += $self->redis->lrem($queue, 1, $value);
+        }
+
+        $self->print("Deleted $num_deleted items");
+    }
 }
 
 sub cmd_freorder {
@@ -115,6 +157,14 @@ sub _format {
     } else {
         die 'unknown _fls_type';
     }
+}
+
+sub _filter {
+    my ($self, $raw_items, $pattern) = @_;
+    return $raw_items unless $pattern;
+
+    my @filtered_items = grep(m/$pattern/, @$raw_items);
+    return \@filtered_items;
 }
 
 1;
