@@ -173,6 +173,7 @@ sub all_cmds {
 sub _extract_error_message {
     my ($self, $message) = @_;
     my ($first_line) = split("\n", $message);
+    return $message unless $first_line;
 
     my $pos = rindex($first_line, ' at ');
     $pos <= 0 and return $message;
