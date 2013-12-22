@@ -10,6 +10,15 @@ has fformat => (
     default => sub { 'raw' },
 );
 
+has fformats => (
+    is => 'ro',
+    default => sub { return {
+        raw  => \&_format_raw,
+        data => \&_format_data,
+        hdp  => \&_format_hdp,
+    }}
+);
+
 has fbuffer => (
     is => 'rw',
     default => sub { {} },
@@ -23,7 +32,9 @@ has all_queue_types => (
 sub cmd_fformat {
     my ($self, $format) = @_;
     if (defined $format) {
-        # validate input
+        exists $self->fformats->{$format}
+            or die "unknown output format\n";
+
         $self->fformat($format);
         $self->repl_mode and $self->print("ReliableFIFO output format: " . $self->fformat);
     } else {
@@ -126,9 +137,61 @@ sub cmd_frequeue {
     $self->print("Requeued $num_requeued out of $len items" . ($do_force ? ' (with force)' : ''));
 }
 
+
+##################################
+# formaters
+##################################
+sub _format {
+    my ($self, $raw_items) = @_;
+    return $self->fformats->{$self->fformat}->($self, $raw_items);
+}
+
+sub _format_raw {
+    my ($self, $raw_items) = @_;
+    return $raw_items;
+}
+
+sub _format_data {
+    my ($self, $raw_items) = @_;
+
+    my @items = map {
+        my $data = Queue::Q::ReliableFIFO::Item->new(_serialized => $_)->data() // {};
+        JSON::encode_json($data);
+    } @{ $raw_items };
+
+    return \@items;
+}
+
+sub _format_hdp {
+    my ($self, $raw_items) = @_;
+    my @items = map {
+        my $item = Queue::Q::ReliableFIFO::Item->new(_serialized => $_);
+        my $data = $item->data() // {};
+        my $error = $item->last_error() // '';
+        $error =~ s/^error importing \d{10} - \d{10}: //;
+        $error =~ s/\s+/ /g;
+
+        sprintf(
+            '%-15s %-25s %-15s %-30s %-10s %-100s',
+            $data->{epoch},
+            $data->{epoch_humanized},
+            join(',', @{ $data->{dc} // ['none'] }),
+            join(',', @{ $data->{type} // ['none'] }),
+            $data->{force} // 0,
+            $self->_extract_error_message($error),
+        );
+    } @{ $raw_items };
+
+    unshift @items, sprintf("%-15s %-25s %-15s %-30s %-10s %-100s",
+                            '<epoch>', '<epoch_humanized>',
+                            '<dc>', '<type>', '<force>', '<error>');
+
+    return \@items;
+}
+
 ##################################
 # internal routines
-#################################
+##################################
 
 sub _get_all_queues {
     my $self = shift;
@@ -142,7 +205,7 @@ sub _set_fbuffer {
     my $length = scalar @$items;
 
     $self->fbuffer({ $queue => $items});
-    $self->repl_mode and $self->print("\nBuffer updated, $length items stored from $queue");
+    $self->print("\nBuffer updated, $length items stored from $queue");
 }
 
 sub _get_fbuffer {
@@ -155,39 +218,6 @@ sub _get_fbuffer {
     return ($queue, $items, scalar @$items);
 }
 
-sub _format {
-    my ($self, $raw_items) = @_;
-
-    if ($self->fformat eq 'raw') {
-        return $raw_items;
-    } elsif ($self->fformat eq 'hdp') {
-        my @items = map {
-            my $item = Queue::Q::ReliableFIFO::Item->new(_serialized => $_);
-            my $data = $item->data() // {};
-            my $error = $item->last_error() // '';
-            $error =~ s/^error importing \d{10} - \d{10}: //;
-            $error =~ s/\s+/ /g;
-
-            sprintf(
-                '%-15s %-25s %-15s %-30s %-10s %-100s',
-                $data->{epoch},
-                $data->{epoch_humanized},
-                join(',', @{ $data->{dc} // ['none'] }),
-                join(',', @{ $data->{type} // ['none'] }),
-                $data->{force} // 0,
-                $self->_extract_error_message($error),
-            );
-        } @{ $raw_items };
-
-        unshift @items, sprintf("%-15s %-25s %-15s %-30s %-10s %-100s",
-                                '<epoch>', '<epoch_humanized>',
-                                '<dc>', '<type>', '<force>', '<error>');
-
-        return \@items;
-    } else {
-        die 'unknown _fls_type';
-    }
-}
 
 sub _filter {
     my ($self, $raw_items, $pattern) = @_;
