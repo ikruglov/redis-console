@@ -232,7 +232,7 @@ sub _completion {
         }
     }
 
-    return grep(/^$text/, @items);
+    return grep(/^$text/, splice(@items, 0, 100));
 }
 
 1;
