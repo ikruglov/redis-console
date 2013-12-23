@@ -6,9 +6,10 @@ use warnings;
 
 use Moo;
 use Redis;
+use Module::Util;
 use Term::ReadLine;
 use Text::ParseWords qw/parse_line/;
-use MooX::Roles::Pluggable search_path => 'RedisConsole::Commands';
+with $_ foreach (Module::Util::find_in_namespace('RedisConsole::Commands'));
 
 has name => ( is => 'ro' );
 
