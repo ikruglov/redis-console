@@ -11,4 +11,6 @@ sub cmd_info {
     $self->print(join("\n", @to_print));
 }
 
+sub completion_for_info {}
+
 1;

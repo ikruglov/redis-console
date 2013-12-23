@@ -8,6 +8,7 @@ use Moo;
 use Redis;
 use Module::Util;
 use Term::ReadLine;
+use Scalar::Util 'weaken';
 use Text::ParseWords qw/parse_line/;
 with $_ foreach (Module::Util::find_in_namespace('RedisConsole::Commands'));
 
@@ -59,6 +60,11 @@ has sub_cmd_prefix => (
     default => sub { 'cmd_' }
 );
 
+has sub_completion_prefix => (
+    is => 'ro',
+    default => sub { 'completion_for_' }
+);
+
 has repl_mode => (
     is => 'rw',
 );
@@ -84,14 +90,17 @@ sub repl {
     $self->repl_mode(1);
     $self->term->ornaments(0);
 
-    my $attr = $self->term->Attribs;
-    $attr->{completion_function} = sub {
-        my ($text, $line, $start) = @_;
-        return if $start; # do cmd autocompletion only
+    my $weakself = $self;
+    weaken($weakself);
 
-        my @items = sort $self->all_cmds();
-        return grep(/^$text/, @items);
-    };
+    my $attr = $self->term->Attribs;
+    if ($self->term->isa("Term::ReadLine::Gnu")) {
+        $attr->{attempted_completion_function} = sub { $weakself->_completion(@_); }
+    } elsif ($self->term->isa("Term::ReadLine::Perl")) {
+        $attr->{completion_function} = sub { $weakself->_completion(@_); }
+    } else {
+        warn "Term::ReadLine::Gnu or Term::ReadLine::Perl is required for the Completion plugin to work";
+    }
 
     while (not $self->exit_repl) {
         my $line = $self->term->readline($self->prompt);
@@ -109,10 +118,7 @@ sub execute {
     my ($self, $line) = @_;
     return 1 unless $line;
 
-    $line=~ s/^\s+//;
-    $line=~ s/\s+$//;
-
-    my ($cmd, @args) = parse_line($self->delimiters, 0, $line);
+    my ($cmd, @args) = $self->_parse_line($line);
     return $self->execute_command($cmd, @args);
 }
 
@@ -191,35 +197,42 @@ sub _all_package_cmds {
     return wantarray ? @cmds : scalar @cmds;
 }
 
-#    my $attr = $self->term->Attribs;
-#    $attr->{completion_function} = sub {
-#        my ($text, $line, $start) = @_;
-#
-#        my @items;
-#        if ($start == 0) {
-#            # do cmd autocompletion
-#            @items = sort @{ $self->all_cmds() };
-#        } else {
-#            # do key autocompletion
-#            my ($cmd) = split /\s+/, $line;
-#            $cmd //= '';
-#
-#            my $completion_func_name = $self->sub_autompletion_prefix() . $cmd;
-#            if ($self->can($completion_func_name)) {
-#                my $res = $self->$completion_func_name($text, $line, $start);
-#                @items = $res ? @{ $res } : ();
-#            } else {
-#                @items = eval { $self->redis->keys('*') };
-#            }
-#        }
-#
-#        return grep(/^$text/, @items);
-#    };
-#
-#has sub_autompletion_prefix => (
-#    is => 'ro',
-#    default => sub { 'completion_for_' }
-#);
-#
+sub _parse_line {
+    my ($self, $line) = @_;
+    return unless $line;
+
+    $line=~ s/^\s+//;
+    $line=~ s/\s+$//;
+    return unless $line;
+
+    return parse_line($self->delimiters, 0, $line);
+}
+
+sub _completion {
+    my ($self, $text, $line, $start) = @_;
+
+    my @items = ();
+    if ($start == 0) {
+        # do cmd autocompletion
+        @items = sort $self->all_cmds();
+    } elsif (my ($cmd) = $self->_parse_line($line)) {
+        # do key autocompletion
+        # detect what parameter we try to autocomplete
+        my $sub_line = substr($line, 0, $start);
+        my (undef, @sub_args) = $self->_parse_line($sub_line);
+        my $param_no = scalar @sub_args + 1;
+
+        my $completion_func_name = $self->sub_completion_prefix() . $cmd;
+        if ($self->can($completion_func_name)) {
+            # command-specific autocompletion
+            @items = $self->$completion_func_name($param_no, $text, $line, $start);
+        } else {
+            # default key autocompletion
+            @items = $param_no == 1 ? eval { $self->redis->keys('*') } : ();
+        }
+    }
+
+    return grep(/^$text/, @items);
+}
 
 1;

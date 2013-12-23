@@ -35,5 +35,9 @@ sub cmd_disconnect {
 
 sub cmd_open { shift->cmd_connect(@_) }
 sub cmd_close { shift->cmd_disconnect(@_) }
+sub completion_for_connect {}
+sub completion_for_disconnect {}
+sub completion_for_open {}
+sub completion_for_close {}
 
 1;

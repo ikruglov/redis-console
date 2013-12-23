@@ -12,4 +12,6 @@ sub cmd_keys {
     $self->print(join("\n", @keys));
 }
 
+sub completion_for_keys {}
+
 1;

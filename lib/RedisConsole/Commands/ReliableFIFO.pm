@@ -42,6 +42,11 @@ sub cmd_fformat {
     }
 }
 
+sub completion_for_fformat {
+    my ($self, $param_no) = @_;
+    return $param_no == 1 ? sort keys %{ $self->fformats } : ();
+}
+
 sub cmd_fbuffer {
     my ($self) = @_;
     my ($queue, $items, $len) = $self->_get_fbuffer();
@@ -49,6 +54,8 @@ sub cmd_fbuffer {
     $self->_print($self->_format($items));
     $self->print("\nBuffer contains $len items from $queue");
 }
+
+sub completion_for_fbuffer {}
 
 sub cmd_fls {
     my ($self, $queue, $p1, $p2) = @_;
@@ -72,6 +79,11 @@ sub cmd_fls {
     }
 }
 
+sub completion_for_fls {
+    my ($self, $param_no) = @_;
+    return $param_no == 1 ? sort $self->_get_all_queues() : ();
+}
+
 sub cmd_fgrep {
     my ($self, $queue, $pattern) = @_;
     die "queue name required\n" unless $queue;
@@ -82,6 +94,11 @@ sub cmd_fgrep {
 
     $self->_print($self->_format(\@filtered_items));
     $self->_set_fbuffer($queue, \@filtered_items);
+}
+
+sub completion_for_fgrep {
+    my ($self, $param_no) = @_;
+    return $param_no == 1 ? sort $self->_get_all_queues() : ();
 }
 
 sub cmd_fdump {
@@ -96,6 +113,8 @@ sub cmd_fdump {
     close($fh);
 }
 
+sub completion_for_fdump {} # TODO file completion
+
 sub cmd_fdel {
     my ($self) = @_;
 
@@ -108,6 +127,8 @@ sub cmd_fdel {
 
     $self->print("Deleted $num_deleted out of $len items");
 }
+
+sub completion_for_fdel {}
 
 sub cmd_frequeue {
     my ($self, $force) = @_;
@@ -137,6 +158,10 @@ sub cmd_frequeue {
     $self->print("Requeued $num_requeued out of $len items" . ($do_force ? ' (with force)' : ''));
 }
 
+sub completion_for_frequeue {
+    my ($self, $param_no) = @_;
+    return $param_no == 1 ? ('force') : ();
+}
 
 ##################################
 # formaters
@@ -218,7 +243,6 @@ sub _get_fbuffer {
     return ($queue, $items, scalar @$items);
 }
 
-
 sub _filter {
     my ($self, $raw_items, $pattern) = @_;
     return $raw_items unless $pattern;
@@ -233,12 +257,3 @@ sub _print {
 }
 
 1;
-
-#
-#sub completion_for_fls   { _queue_completion(@_); }
-#sub completion_for_fgrep { _queue_completion(@_); }
-#
-#sub _queue_completion {
-#    my @queues = sort $_[0]->_get_all_queues();
-#    return \@queues;
-#}

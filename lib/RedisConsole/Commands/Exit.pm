@@ -14,4 +14,7 @@ sub cmd_quit {
     return shift->cmd_exit;
 }
 
+sub completion_for_exit {}
+sub completion_for_quit {}
+
 1;
